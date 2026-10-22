@@ -1,4 +1,4 @@
-# AeroFresh – Maize Storage Monitor (Phase 1 demo)
+# AeroFresh – Cereal Storage Monitor
 
 A browser-only demonstration of how **simulated** IoT readings can be turned into maize-storage risk alerts and
 suggested interventions. **No backend, database, authentication, cloud services, AI model or hardware.**
@@ -17,7 +17,7 @@ npm run build      # type-check + production build
 ## Try the demo (≈1 minute)
 
 1. Pick **Rising humidity** and press **Start**. Readings arrive every 2.5 s (use 2× / 4× to speed up).
-2. After ~25 s a **Persistent high ambient humidity** alert appears (warning, then critical). It stays a single alert while the condition persists.
+2. After the ambient humidity crosses its warning threshold and persists for 6 seconds, a **Persistent high ambient humidity** alert appears (warning, then critical). It stays a single alert while the condition persists.
 3. Read the reason and recommended actions, then press **Acknowledge**.
 4. Switch to **Recovery after intervention** and press **Send ON command** on the simulated fan. Temperature and humidity ease back to normal, the alert clears itself, and the event log records everything.
 5. Try the other scenarios: rising temperature, high grain moisture (adds a grain-moisture measurement), sensor offline (readings stop; gaps in the chart; stale warning).
@@ -31,17 +31,19 @@ npm run build      # type-check + production build
 | `src/lib/prediction.ts` | Local linear extrapolation of recent contiguous temperature and humidity readings; not an AI model or alert. |
 | `src/lib/store.ts` | Pure reducer and app state; history capped at 100 readings. |
 | `src/lib/storage.ts` | localStorage save/load with field-by-field validation; corrupt data falls back to defaults. |
-| `src/components/*` | Dashboard and responsive navigation, store/bay view, alert history export, trend summary/export, simulator controls, alerts, simulated fan, events, editable thresholds. |
+| `src/components/*` | Dashboard and responsive navigation, browser-persisted store/bay management, alert history export, trend summary/export, simulator controls, alerts, simulated fan, events, editable thresholds. |
 | `tests/*` | Unit tests (Node's built-in test runner via `tsx`). |
 
-### Rules (all thresholds are illustrative and unvalidated; editable in the UI)
+### Maize default thresholds (editable in Settings)
 
 - **Alert delay:** all demo findings must persist continuously for 6 seconds before an alert is raised; sensor-offline findings must also meet the missed-reading threshold.
-- **Ambient humidity:** warning if RH ≥ 70%; critical if ≥ 80%, after the alert delay.
-- **Temperature:** warning ≥ 30 °C or a rise ≥ 2 °C within 6 readings; critical ≥ 35 °C.
-- **Grain moisture:** evaluated *only* when the scenario supplies a measurement (warning ≥ 13.5%, critical ≥ 15.5%). It is never inferred from ambient humidity.
+- **Ambient humidity:** warning if RH ≥ 60%; critical if ≥ 65%, after the alert delay.
+- **Temperature:** warning ≥ 13.5 °C or a rise ≥ 2 °C within 6 readings; critical ≥ 15 °C.
+- **Grain moisture:** evaluated *only* when the scenario supplies a measurement (warning ≥ 12%, critical ≥ 13%). It is never inferred from ambient humidity.
 - **Sensor offline:** warning after 3 missed readings; critical after 9.
 - **Deduplication:** one unresolved alert per rule and storage unit; severity can escalate but not duplicate; alerts auto-resolve when the condition clears; a resolved alert cannot re-fire for 20 readings (cooldown).
+
+These are the requested AeroFresh maize defaults. They are editable and have not been independently validated as agronomic guidance.
 
 ### Short-term trend outlook
 
@@ -59,7 +61,7 @@ The simulator always starts paused after a reload. **Reset** (simulator) clears 
 
 ## Limitations
 
-- All data is simulated. Thresholds are illustrative, not agronomic guidance, and have not been validated.
+- All data is simulated. The requested maize thresholds have not been independently validated as agronomic guidance.
 - Temperature and humidity readings cannot detect insects, mould or aflatoxin. “Normal” only means no demo rule is triggered; the app never labels maize safe, aflatoxin-free or pest-free.
-- The fan is a software state only. Its effect on readings is modelled for the Recovery scenario and is not evidence that real ventilation would do the same; it does not change grain moisture.
+- The fan is a software state only. Its effect on readings is simulated and is not evidence that real ventilation would do the same; it does not change grain moisture.
 - One simulated storage unit. No authentication, backend, SMS/WhatsApp notifications or hardware integration (future phases).

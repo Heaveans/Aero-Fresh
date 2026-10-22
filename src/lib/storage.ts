@@ -2,7 +2,7 @@
 import { DEFAULT_THRESHOLDS } from './risk';
 import { SCENARIOS } from './simulator';
 import { ALERTS_MAX, EVENTS_MAX, HISTORY_MAX, INTERVENTIONS_MAX, type AppState, type Persisted } from './store';
-import type { Alert, AppEvent, FanCommand, Reading, ScenarioId, SimState, Speed, Thresholds } from './types';
+import type { Alert, AppEvent, FanCommand, Reading, ScenarioId, SimState, Speed, StorageBay, StorageStore, Thresholds } from './types';
 
 const KEY = 'aerofresh-maize-demo:v1';
 
@@ -30,6 +30,10 @@ const isFan = (v: unknown): v is FanCommand =>
   isObj(v) && isStr(v.id) && isNum(v.t) && (v.command === 'ON' || v.command === 'OFF') && isStr(v.scenario) && v.scenario in SCENARIOS &&
   (v.source === undefined || ['manual', 'automatic', 'system'].includes(v.source as string)) &&
   (v.durationSeconds === undefined || isNum(v.durationSeconds));
+const isBay = (v: unknown): v is StorageBay =>
+  isObj(v) && isStr(v.id) && isStr(v.name) && (v.unitId === undefined || isStr(v.unitId));
+const isStore = (v: unknown): v is StorageStore =>
+  isObj(v) && isStr(v.id) && isStr(v.name) && Array.isArray(v.bays) && v.bays.every(isBay);
 
 /** Validate untrusted stored data field-by-field; invalid fields are simply omitted. */
 export function sanitize(raw: unknown): Partial<Persisted> {
@@ -39,9 +43,19 @@ export function sanitize(raw: unknown): Partial<Persisted> {
   if (raw.speed === 1 || raw.speed === 2 || raw.speed === 4) out.speed = raw.speed as Speed;
   if (isObj(raw.thresholds)) {
     const th: Thresholds = { ...DEFAULT_THRESHOLDS };
+    const previousDefaults: Partial<Record<keyof Thresholds, number>> = {
+      humidityWarn: 70,
+      humidityCritical: 80,
+      tempWarn: 30,
+      tempCritical: 35,
+      moistureWarn: 13.5,
+      moistureCritical: 15.5,
+    };
     for (const k of Object.keys(th) as (keyof Thresholds)[]) {
       const v = (raw.thresholds as Record<string, unknown>)[k];
-      if (isNum(v) && v >= 0) th[k] = v;
+      if (isNum(v) && v >= 0) {
+        th[k] = previousDefaults[k] === v ? DEFAULT_THRESHOLDS[k] : v;
+      }
     }
     out.thresholds = th;
   }
@@ -50,7 +64,11 @@ export function sanitize(raw: unknown): Partial<Persisted> {
     out.sim = { tick: s.tick, temp: s.temp, rh: s.rh, moisture: s.moisture as number | null, missedTicks: s.missedTicks } as SimState;
   }
   if (Array.isArray(raw.history)) out.history = raw.history.filter(isReading).slice(-HISTORY_MAX);
-  if (Array.isArray(raw.alerts)) out.alerts = raw.alerts.filter(isAlert).slice(-ALERTS_MAX);
+  if (Array.isArray(raw.alerts)) {
+    out.alerts = raw.alerts.filter(isAlert).slice(-ALERTS_MAX).map((alert) =>
+      alert.unitName === 'Store A – Bay 1 (simulated)' ? { ...alert, unitName: 'Var -A (Maize) Store 1 Bay A' } : alert,
+    );
+  }
   if (Array.isArray(raw.events)) out.events = raw.events.filter(isEvent).slice(0, EVENTS_MAX);
   if (Array.isArray(raw.interventions)) out.interventions = raw.interventions.filter(isFan).slice(0, INTERVENTIONS_MAX);
   if (typeof raw.fanOn === 'boolean') out.fanOn = raw.fanOn;
@@ -58,6 +76,21 @@ export function sanitize(raw: unknown): Partial<Persisted> {
   else if (raw.fanOn === true) out.fanMode = 'manual';
   if (raw.fanUntilAt === null || isNum(raw.fanUntilAt)) out.fanUntilAt = raw.fanUntilAt;
   if (typeof raw.autoFanSuppressed === 'boolean') out.autoFanSuppressed = raw.autoFanSuppressed;
+  if (Array.isArray(raw.stores)) {
+    out.stores = raw.stores.filter(isStore).map((store) =>
+      store.id === 'store-1' && store.name === 'Store A'
+        ? {
+            ...store,
+            name: 'Store 1',
+            bays: store.bays.map((bay) =>
+              bay.id === 'bay-1' && bay.name === 'Bay 1' && bay.unitId === 'SU-01'
+                ? { ...bay, name: 'Bay A' }
+                : bay,
+            ),
+          }
+        : store,
+    );
+  }
   if (isObj(raw.conditionSince)) {
     const since: NonNullable<Persisted['conditionSince']> = {};
     for (const id of ['humidity', 'temperature', 'moisture', 'offline'] as const) {

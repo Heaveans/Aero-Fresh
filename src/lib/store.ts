@@ -1,7 +1,7 @@
 /** Pure app state + reducer (no React, no browser APIs) so it can be unit-tested. */
 import { DEFAULT_THRESHOLDS, RULE_LABELS, evaluateRules, reconcileAlerts, type EventInput } from './risk';
 import { BASE_INTERVAL_MS, INITIAL_SIM, SCENARIOS, UNIT_ID, UNIT_NAME, stepSim, type Noise } from './simulator';
-import type { Alert, AppEvent, FanCommand, Reading, ScenarioId, SimState, Speed, Thresholds } from './types';
+import type { Alert, AppEvent, FanCommand, Reading, ScenarioId, SimState, Speed, StorageStore, Thresholds } from './types';
 
 export const HISTORY_MAX = 100;
 export const EVENTS_MAX = 100;
@@ -23,6 +23,7 @@ export interface AppState {
   fanUntilAt: number | null;
   conditionSince: Partial<Record<Alert['ruleId'], number>>;
   autoFanSuppressed: boolean;
+  stores: StorageStore[];
   seq: number;
 }
 export type Persisted = Omit<AppState, 'running'>;
@@ -43,6 +44,7 @@ export function initState(p: Partial<Persisted> = {}): AppState {
     fanUntilAt: null,
     conditionSince: {},
     autoFanSuppressed: false,
+    stores: [{ id: 'store-1', name: 'Store 1', bays: [{ id: 'bay-1', name: 'Bay A', unitId: UNIT_ID }] }],
     seq: 0,
     ...p,
   };
@@ -60,6 +62,8 @@ export type Action =
   | { type: 'resolve'; id: string; now: number }
   | { type: 'fan'; command: 'ON' | 'OFF'; now: number }
   | { type: 'fanTimeout'; now: number }
+  | { type: 'addStore'; name: string; now: number }
+  | { type: 'addBay'; storeId: string; name: string; now: number }
   | { type: 'setThreshold'; key: keyof Thresholds; value: number }
   | { type: 'resetThresholds' };
 
@@ -153,6 +157,40 @@ export function reducer(s: AppState, a: Action): AppState {
       return { ...s, scenario: a.id, ...withEvents(s, [{ kind: 'scenario', message: `Scenario changed to "${SCENARIOS[a.id].label}".` }], a.now) };
     case 'setSpeed':
       return { ...s, speed: a.speed };
+    case 'addStore': {
+      const name = a.name.trim();
+      if (!name) return s;
+      let number = 1;
+      while (s.stores.some((store) => store.id === `store-${number}`)) number++;
+      const store: StorageStore = { id: `store-${number}`, name, bays: [] };
+      return {
+        ...s,
+        stores: [...s.stores, store],
+        ...withEvents(s, [{ kind: 'system', message: `Store added: ${name}.` }], a.now),
+      };
+    }
+    case 'addBay': {
+      const name = a.name.trim();
+      if (!name) return s;
+      const store = s.stores.find((item) => item.id === a.storeId);
+      if (!store) return s;
+      const nextNumber = store.bays.reduce((max, bay) => {
+        const match = /^bay-(\d+)$/.exec(bay.id);
+        return match ? Math.max(max, Number(match[1])) : max;
+      }, 0) + 1;
+      const bayName = store.bays.some((bay) => bay.name.toLocaleLowerCase() === name.toLocaleLowerCase())
+        ? `${name} (${nextNumber})`
+        : name;
+      return {
+        ...s,
+        stores: s.stores.map((item) =>
+          item.id === a.storeId
+            ? { ...item, bays: [...item.bays, { id: `bay-${nextNumber}`, name: bayName }] }
+            : item,
+        ),
+        ...withEvents(s, [{ kind: 'system', message: `Bay added to ${store.name}: ${bayName}.` }], a.now),
+      };
+    }
     case 'ack':
       return {
         ...s,

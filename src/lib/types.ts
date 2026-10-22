@@ -89,3 +89,15 @@ export interface FanCommand {
   source?: 'manual' | 'automatic' | 'system';
   durationSeconds?: number;
 }
+
+export interface StorageBay {
+  id: string;
+  name: string;
+  unitId?: string;
+}
+
+export interface StorageStore {
+  id: string;
+  name: string;
+  bays: StorageBay[];
+}

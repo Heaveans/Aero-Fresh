@@ -13,15 +13,15 @@
 import type { Alert, Finding, Reading, RiskLevel, RuleId, Severity, Thresholds } from './types';
 
 export const DEFAULT_THRESHOLDS: Thresholds = {
-  humidityWarn: 70,
-  humidityCritical: 80,
+  humidityWarn: 60,
+  humidityCritical: 65,
   alertPersistSeconds: 6,
-  tempWarn: 30,
-  tempCritical: 35,
+  tempWarn: 13.5,
+  tempCritical: 15,
   tempTrendRise: 2,
   tempTrendWindow: 6,
-  moistureWarn: 13.5,
-  moistureCritical: 15.5,
+  moistureWarn: 12,
+  moistureCritical: 13,
   staleReadings: 3,
   cooldownTicks: 20,
 };

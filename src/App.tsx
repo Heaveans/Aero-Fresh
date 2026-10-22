@@ -9,6 +9,7 @@ import { PredictionPanel } from './components/PredictionPanel';
 import { RulesPanel } from './components/RulesPanel';
 import { Sidebar, type PageId } from './components/Sidebar';
 import { SimulatorPanel } from './components/SimulatorPanel';
+import { StoresPanel } from './components/StoresPanel';
 import { TrendChart } from './components/TrendChart';
 import { TrendSummary } from './components/TrendSummary';
 import { fmtTime } from './lib/format';
@@ -84,7 +85,8 @@ export default function App() {
             <Wheat className="text-maize-400" size={28} aria-hidden />
             <div>
               <h1 className="font-display text-xl font-bold leading-tight">AeroFresh</h1>
-              <p className="text-xs text-forest-100">Maize storage monitor · {UNIT_NAME}</p>
+              <p className="text-xs text-forest-100">Cereal Storage Monitor</p>
+              <p className="text-xs text-forest-100">{UNIT_NAME}</p>
             </div>
           </div>
           <button
@@ -147,34 +149,17 @@ export default function App() {
             )}
 
             {page === 'stores' && (
-              <section className="card">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-forest-700">Storage unit</p>
-                    <h2 className="mt-1 font-display text-xl font-bold text-forest-900">{UNIT_NAME}</h2>
-                    <p className="mt-1 text-sm text-charcoal/65">Unit ID: SU-01 · One simulated store is configured in this demo.</p>
-                  </div>
-                  <span className="rounded-full bg-maize-100 px-3 py-1 text-xs font-semibold text-charcoal">SIMULATED</span>
-                </div>
-                <div className="mt-4 rounded-md border border-forest-100 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <h3 className="font-semibold text-forest-900">Bay 1</h3>
-                      <p className="text-sm text-charcoal/65">Monitoring unit SU-01</p>
-                    </div>
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${stale ? 'bg-maize-100 text-charcoal' : 'bg-forest-100 text-forest-900'}`}>
-                      {stale ? 'Stale readings' : s.history.length === 0 ? 'Waiting for readings' : 'Monitoring'}
-                    </span>
-                  </div>
-                  <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
-                    <div><dt className="text-charcoal/60">Temperature</dt><dd className="font-semibold">{lv?.temp == null ? '—' : `${lv.temp.toFixed(1)} °C`}</dd></div>
-                    <div><dt className="text-charcoal/60">Ambient humidity</dt><dd className="font-semibold">{lv?.rh == null ? '—' : `${lv.rh.toFixed(1)}%`}</dd></div>
-                    <div><dt className="text-charcoal/60">Open alerts</dt><dd className="font-semibold">{openAlerts}</dd></div>
-                  </dl>
-                  <button className="btn-ghost mt-4" onClick={() => setPage('dashboard')}>Open dashboard</button>
-                </div>
-                <p className="mt-4 text-xs text-charcoal/60">Store and bay management is informational only; this demo has no real-world device or location integration.</p>
-              </section>
+              <StoresPanel
+                stores={s.stores}
+                monitoredUnitId="SU-01"
+                temperature={lv?.temp ?? null}
+                humidity={lv?.rh ?? null}
+                openAlerts={openAlerts}
+                stale={stale}
+                onAddStore={(name) => dispatch({ type: 'addStore', name, now: Date.now() })}
+                onAddBay={(storeId, name) => dispatch({ type: 'addBay', storeId, name, now: Date.now() })}
+                onOpenDashboard={() => setPage('dashboard')}
+              />
             )}
 
             {page === 'alerts' && <AlertHistoryPanel alerts={s.alerts} />}

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { INITIAL_SIM, SCENARIOS, stepSim, type Noise } from '../src/lib/simulator';
 import { HISTORY_MAX, initState, reducer } from '../src/lib/store';
+import { DEFAULT_THRESHOLDS } from '../src/lib/risk';
 import { sanitize } from '../src/lib/storage';
 import type { Alert, ScenarioId, SimState } from '../src/lib/types';
 
@@ -26,7 +27,8 @@ test('rising humidity changes gradually and never jumps', () => {
 test('rising temperature climbs gradually', () => {
   const { readings } = run(INITIAL_SIM, 'rising_temperature', 30);
   for (let i = 1; i < readings.length; i++) assert.ok(readings[i].temp! - readings[i - 1].temp! <= 0.5001);
-  assert.ok(readings[29].temp! > 35);
+  assert.ok(readings[29].temp! > 15);
+  assert.ok(INITIAL_SIM.temp < DEFAULT_THRESHOLDS.tempWarn);
 });
 
 test('high grain moisture scenario supplies a rising measurement', () => {
@@ -53,9 +55,9 @@ test('recovery only improves readings while the simulated fan is ON', () => {
   const fanOn = run(hot, 'recovery', 10, true).sim;
   assert.ok(fanOn.temp < 38 && fanOn.rh < 90);
   assert.equal(fanOn.moisture, 15, 'fan does not change grain moisture');
-  const done = run(hot, 'recovery', 40, true).sim;
-  assert.equal(done.temp, 24);
-  assert.equal(done.rh, 60);
+  const done = run(hot, 'recovery', 50, true).sim;
+  assert.equal(done.temp, 12.5);
+  assert.equal(done.rh, 55);
 });
 
 test('fan corrects rising scenario readings without changing measured grain moisture', () => {
@@ -172,6 +174,28 @@ test('manual fan runtime follows criticality and expires even if simulation tick
   assert.equal(s.interventions[0].command, 'OFF');
 });
 
+test('stores and bays can be added locally and retain their parent relationship', () => {
+  let s = initState();
+  assert.equal(s.stores.length, 1);
+  s = reducer(s, { type: 'addStore', name: '  North Store  ', now: 10 });
+  assert.equal(s.stores[1].name, 'North Store');
+  assert.deepEqual(s.stores[1].bays, []);
+
+  s = reducer(s, { type: 'addBay', storeId: s.stores[1].id, name: 'Bay 1', now: 20 });
+  s = reducer(s, { type: 'addBay', storeId: s.stores[1].id, name: 'Bay 1', now: 30 });
+  assert.deepEqual(s.stores[1].bays.map((bay) => bay.name), ['Bay 1', 'Bay 1 (2)']);
+  assert.equal(s.stores[1].bays[0].unitId, undefined, 'new bays are not implicitly assigned a sensor');
+
+  const unchanged = reducer(s, { type: 'addStore', name: '  ', now: 40 });
+  assert.equal(unchanged.stores.length, 2);
+  const orphanBay = reducer(s, { type: 'addBay', storeId: 'missing', name: 'Bay', now: 50 });
+  assert.equal(orphanBay.stores.length, 2);
+
+  const { running: _running, ...saved } = s;
+  const restored = sanitize(JSON.parse(JSON.stringify(saved)));
+  assert.deepEqual(restored.stores, s.stores);
+});
+
 test('end-to-end: alert → acknowledge → fan ON in recovery → condition clears and auto-resolves', () => {
   let s = initState({ scenario: 'rising_humidity' });
   let now = 0;
@@ -219,13 +243,14 @@ test('storage: corrupt or malformed data falls back safely', () => {
   });
   assert.equal(s.scenario, undefined);
   assert.equal(s.speed, undefined);
-  assert.equal(s.thresholds!.humidityWarn, 70, 'invalid value replaced by default');
+  assert.equal(s.thresholds!.humidityWarn, 60, 'invalid value replaced by default');
   assert.equal(s.thresholds!.tempWarn, 31, 'valid value kept');
   assert.equal(s.sim, undefined);
   assert.deepEqual(s.history, []);
   assert.deepEqual(s.alerts, []);
   assert.equal(s.events, undefined);
   assert.equal(s.fanOn, undefined);
+  assert.equal(s.stores, undefined);
 });
 
 test('storage: valid saved state round-trips', () => {
@@ -241,4 +266,46 @@ test('storage: valid saved state round-trips', () => {
   assert.equal(back.fanMode, 'manual');
   assert.equal(back.fanUntilAt, s.fanUntilAt);
   assert.equal(back.scenario, 'rising_humidity');
+});
+
+test('maize defaults match the requested thresholds and legacy defaults migrate without overwriting custom values', () => {
+  assert.deepEqual(DEFAULT_THRESHOLDS, {
+    humidityWarn: 60,
+    humidityCritical: 65,
+    alertPersistSeconds: 6,
+    tempWarn: 13.5,
+    tempCritical: 15,
+    tempTrendRise: 2,
+    tempTrendWindow: 6,
+    moistureWarn: 12,
+    moistureCritical: 13,
+    staleReadings: 3,
+    cooldownTicks: 20,
+  });
+
+  const migrated = sanitize({
+    thresholds: {
+      humidityWarn: 70,
+      humidityCritical: 80,
+      alertPersistSeconds: 6,
+      tempWarn: 30,
+      tempCritical: 35,
+      tempTrendRise: 1.5,
+      tempTrendWindow: 6,
+      moistureWarn: 13.5,
+      moistureCritical: 15.5,
+      staleReadings: 3,
+      cooldownTicks: 20,
+    },
+    stores: [{ id: 'store-1', name: 'Store A', bays: [{ id: 'bay-1', name: 'Bay 1', unitId: 'SU-01' }] }],
+  });
+  assert.deepEqual(migrated.thresholds, {
+    ...DEFAULT_THRESHOLDS,
+    tempTrendRise: 1.5,
+  });
+  assert.deepEqual(migrated.stores, [{ id: 'store-1', name: 'Store 1', bays: [{ id: 'bay-1', name: 'Bay A', unitId: 'SU-01' }] }]);
+
+  const custom = sanitize({ thresholds: { humidityWarn: 72, tempWarn: 28 } });
+  assert.equal(custom.thresholds?.humidityWarn, 72);
+  assert.equal(custom.thresholds?.tempWarn, 28);
 });

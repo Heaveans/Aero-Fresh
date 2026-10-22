@@ -5,9 +5,10 @@
 import type { Reading, ScenarioId, SimState } from './types';
 
 export const UNIT_ID = 'SU-01';
-export const UNIT_NAME = 'Store A – Bay 1 (simulated)';
+export const UNIT_NAME = 'Var -A (Maize) Store 1 Bay A';
 export const BASE_INTERVAL_MS = 2500;
-export const INITIAL_SIM: SimState = { tick: 0, temp: 24, rh: 60, moisture: null, missedTicks: 0 };
+const BASELINE_TEMP = 12.5;
+export const INITIAL_SIM: SimState = { tick: 0, temp: BASELINE_TEMP, rh: 55, moisture: null, missedTicks: 0 };
 
 interface ScenarioDef {
   label: string;
@@ -22,12 +23,12 @@ interface ScenarioDef {
 }
 
 export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
-  normal: { label: 'Normal storage', description: 'Stable temperature and humidity.', tempTarget: 24, rhTarget: 60, tempStep: 0.3, rhStep: 1, moisture: 'off' },
-  rising_humidity: { label: 'Rising humidity', description: 'Ambient humidity climbs steadily.', tempTarget: 25, rhTarget: 92, tempStep: 0.2, rhStep: 2, moisture: 'off' },
-  rising_temperature: { label: 'Rising temperature', description: 'Store temperature climbs steadily.', tempTarget: 38, rhTarget: 60, tempStep: 0.5, rhStep: 0.5, moisture: 'off' },
-  high_grain_moisture: { label: 'High grain moisture', description: 'Adds a grain-moisture measurement that climbs.', tempTarget: 25, rhTarget: 68, tempStep: 0.2, rhStep: 0.5, moisture: 'rise' },
+  normal: { label: 'Normal storage', description: 'Stable temperature and humidity.', tempTarget: BASELINE_TEMP, rhTarget: 55, tempStep: 0.3, rhStep: 1, moisture: 'off' },
+  rising_humidity: { label: 'Rising humidity', description: 'Ambient humidity climbs steadily.', tempTarget: 13, rhTarget: 92, tempStep: 0.2, rhStep: 2, moisture: 'off' },
+  rising_temperature: { label: 'Rising temperature', description: 'Store temperature climbs steadily.', tempTarget: 20, rhTarget: 55, tempStep: 0.5, rhStep: 0.5, moisture: 'off' },
+  high_grain_moisture: { label: 'High grain moisture', description: 'Adds a grain-moisture measurement that climbs.', tempTarget: BASELINE_TEMP, rhTarget: 58, tempStep: 0.2, rhStep: 0.5, moisture: 'rise' },
   sensor_offline: { label: 'Sensor offline', description: 'Readings stop arriving.', tempStep: 0, rhStep: 0, moisture: 'hold', offline: true },
-  recovery: { label: 'Recovery after intervention', description: 'Readings ease back toward baseline while the simulated fan is ON. Grain moisture is not changed.', tempTarget: 24, rhTarget: 60, tempStep: 0.6, rhStep: 1.5, moisture: 'hold', fanDriven: true },
+  recovery: { label: 'Recovery after intervention', description: 'Readings ease back toward baseline while the simulated fan is ON. Grain moisture is not changed.', tempTarget: BASELINE_TEMP, rhTarget: 55, tempStep: 0.6, rhStep: 1.5, moisture: 'hold', fanDriven: true },
 };
 export const SCENARIO_IDS = Object.keys(SCENARIOS) as ScenarioId[];
 
@@ -58,13 +59,13 @@ export function stepSim(sim: SimState, scenario: ScenarioId, fanOn: boolean, noi
 
   let { temp, rh, moisture } = sim;
   if (fanOn) {
-    temp = toward(temp, 24, 0.6);
-    rh = toward(rh, 60, 1.5);
+    temp = toward(temp, BASELINE_TEMP, 0.6);
+    rh = toward(rh, 55, 1.5);
   } else if (!def.fanDriven) {
     if (def.tempTarget !== undefined) temp = toward(temp, def.tempTarget, def.tempStep);
     if (def.rhTarget !== undefined) rh = toward(rh, def.rhTarget, def.rhStep);
   }
-  temp = clamp(temp, 10, 45);
+  temp = clamp(temp, 8, 45);
   rh = clamp(rh, 20, 99);
 
   if (def.moisture === 'off') moisture = null;

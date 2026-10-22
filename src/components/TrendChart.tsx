@@ -20,7 +20,7 @@ export function TrendChart({ history, th, className = '' }: { history: Reading[]
           <LineChart data={data} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#D6E8DB" />
             <XAxis dataKey="time" tick={{ fontSize: 11 }} minTickGap={40} />
-            <YAxis yAxisId="temp" domain={[15, 45]} tick={{ fontSize: 11 }} unit="°" />
+            <YAxis yAxisId="temp" domain={[8, 30]} tick={{ fontSize: 11 }} unit="°" />
             <YAxis yAxisId="rh" orientation="right" domain={[30, 100]} tick={{ fontSize: 11 }} unit="%" />
             <Tooltip />
             <Legend />
