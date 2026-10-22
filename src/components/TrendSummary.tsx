@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { fmtTime } from '../lib/format';
+import { EXPORT_PERIOD_OPTIONS, filterByPeriod, type ExportPeriod } from '../lib/exportPeriod';
 import type { Reading } from '../lib/types';
 
 function stats(readings: Reading[], metric: 'temp' | 'rh') {
@@ -37,7 +39,7 @@ function MetricSummary({ label, unit, value, samples }: { label: string; unit: s
   );
 }
 
-function exportReadings(history: Reading[]) {
+function exportReadings(history: Reading[], period: ExportPeriod) {
   const escape = (value: string | number | boolean | null) => `"${String(value ?? '').replace(/"/g, '""')}"`;
   const rows = [
     ['Timestamp', 'Tick', 'Storage unit', 'Temperature (C)', 'Ambient humidity (%)', 'Grain moisture (%)', 'Offline'],
@@ -55,12 +57,14 @@ function exportReadings(history: Reading[]) {
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'aerofresh-trend-history.csv';
+  link.download = `aerofresh-trend-history-${period}.csv`;
   link.click();
   URL.revokeObjectURL(url);
 }
 
 export function TrendSummary({ history }: { history: Reading[] }) {
+  const [exportPeriod, setExportPeriod] = useState<ExportPeriod>('week');
+  const exportHistory = filterByPeriod(history, (reading) => reading.t, exportPeriod);
   const validReadings = history.filter((reading) => !reading.offline);
   const temperature = stats(validReadings, 'temp');
   const humidity = stats(validReadings, 'rh');
@@ -75,9 +79,20 @@ export function TrendSummary({ history }: { history: Reading[] }) {
             {history.length} retained readings{firstTime && lastTime ? ` · ${fmtTime(firstTime)}–${fmtTime(lastTime)}` : ''}
           </p>
         </div>
-        <button className="btn-ghost" disabled={history.length === 0} onClick={() => exportReadings(history)}>
-          <Download size={16} aria-hidden /> Export readings CSV
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="sr-only" htmlFor="readings-export-period">Readings export period</label>
+          <select
+            id="readings-export-period"
+            className="rounded border border-forest-200 bg-white px-2 py-2 text-sm"
+            value={exportPeriod}
+            onChange={(event) => setExportPeriod(event.target.value as ExportPeriod)}
+          >
+            {EXPORT_PERIOD_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+          <button className="btn-ghost" disabled={exportHistory.length === 0} onClick={() => exportReadings(exportHistory, exportPeriod)}>
+            <Download size={16} aria-hidden /> Export readings CSV ({exportHistory.length})
+          </button>
+        </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <MetricSummary label="Temperature" unit="°C" value={temperature} samples={validReadings.filter((reading) => reading.temp !== null).length} />

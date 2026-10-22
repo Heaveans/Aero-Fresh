@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { fmtTime } from '../lib/format';
+import { EXPORT_PERIOD_OPTIONS, filterByPeriod, type ExportPeriod } from '../lib/exportPeriod';
 import { RULE_LABELS } from '../lib/risk';
 import type { Alert } from '../lib/types';
 
@@ -7,7 +9,7 @@ function csvCell(value: string | number | undefined) {
   return `"${String(value ?? '').replace(/"/g, '""')}"`;
 }
 
-function exportAlerts(alerts: Alert[]) {
+function exportAlerts(alerts: Alert[], period: ExportPeriod) {
   const columns = ['Raised at', 'Storage unit', 'Rule', 'Severity', 'Status', 'Trigger', 'Reason', 'Occurrences', 'Resolved at', 'Resolution'];
   const rows = alerts.map((alert) => [
     new Date(alert.raisedAt).toISOString(),
@@ -25,13 +27,15 @@ function exportAlerts(alerts: Alert[]) {
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'aerofresh-alert-history.csv';
+  link.download = `aerofresh-alert-history-${period}.csv`;
   link.click();
   URL.revokeObjectURL(url);
 }
 
 export function AlertHistoryPanel({ alerts }: { alerts: Alert[] }) {
+  const [exportPeriod, setExportPeriod] = useState<ExportPeriod>('week');
   const sorted = [...alerts].sort((a, b) => b.raisedAt - a.raisedAt);
+  const exportAlertsInPeriod = filterByPeriod(sorted, (alert) => alert.raisedAt, exportPeriod);
   return (
     <section className="card">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -39,9 +43,20 @@ export function AlertHistoryPanel({ alerts }: { alerts: Alert[] }) {
           <h2 className="font-display text-lg font-bold text-forest-900">Alert history</h2>
           <p className="text-sm text-charcoal/65">All recorded alerts, including acknowledged and resolved items.</p>
         </div>
-        <button className="btn-ghost" disabled={sorted.length === 0} onClick={() => exportAlerts(sorted)}>
-          <Download size={16} aria-hidden /> Export CSV
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="sr-only" htmlFor="alerts-export-period">Alert export period</label>
+          <select
+            id="alerts-export-period"
+            className="rounded border border-forest-200 bg-white px-2 py-2 text-sm"
+            value={exportPeriod}
+            onChange={(event) => setExportPeriod(event.target.value as ExportPeriod)}
+          >
+            {EXPORT_PERIOD_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+          <button className="btn-ghost" disabled={exportAlertsInPeriod.length === 0} onClick={() => exportAlerts(exportAlertsInPeriod, exportPeriod)}>
+            <Download size={16} aria-hidden /> Export CSV ({exportAlertsInPeriod.length})
+          </button>
+        </div>
       </div>
       {sorted.length === 0 ? (
         <p className="mt-4 rounded-md bg-forest-50 p-3 text-sm">No alert history yet. Alerts will be listed here when demo rules trigger.</p>

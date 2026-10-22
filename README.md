@@ -28,7 +28,7 @@ npm run build      # type-check + production build
 |---|---|
 | `src/lib/simulator.ts` | Scenario engine. Gradual, bounded changes per reading; randomness is injected so it is testable. |
 | `src/lib/risk.ts` | Transparent rules (`evaluateRules`), alert deduplication/cooldown (`reconcileAlerts`), overall status. |
-| `src/lib/prediction.ts` | Local linear extrapolation of recent contiguous temperature and humidity readings; not an AI model or alert. |
+| `src/lib/prediction.ts`, `src/lib/score.ts` | Quality-checked trend projection and weighted condition score; both are transparent heuristics, not trained models or alert rules. |
 | `src/lib/store.ts` | Pure reducer and app state; history capped at 100 readings. |
 | `src/lib/storage.ts` | localStorage save/load with field-by-field validation; corrupt data falls back to defaults. |
 | `src/components/*` | Dashboard and responsive navigation, browser-persisted store/bay management, alert history export, trend summary/export, simulator controls, alerts, simulated fan, events, editable thresholds. |
@@ -47,7 +47,11 @@ These are the requested AeroFresh maize defaults. They are editable and have not
 
 ### Short-term trend outlook
 
-The dashboard estimates temperature and ambient-humidity threshold crossings from up to six recent contiguous readings using a linear trend. It needs at least three readings, pauses estimates while the sensor is offline, and reports warning-threshold crossings only within the next 20 readings. This is an illustrative extrapolation—not a validated risk forecast, alert, AI model, or food-safety assessment. Grain moisture is intentionally excluded because it may not be measured in a scenario.
+The dashboard estimates temperature, ambient-humidity, and (when measured) grain-moisture threshold crossings from the last 12 contiguous readings. It requires at least six readings and declines to project when data is stale, the trend is flat or falling, or the fit is too noisy. It shows a confidence label, fit quality, and a self-check against a projection made five readings earlier. The chart horizon is 10 readings; threshold-crossing estimates are limited to the next 60 readings. This is an illustrative straight-line extrapolation—not a validated risk forecast, alert, AI model, or food-safety assessment.
+
+### Condition risk score
+
+The dashboard also shows a 0–100 weighted heuristic based on ambient humidity, temperature, temperature rise, and measured grain moisture. It uses the same editable warning/critical thresholds as the alert rules; unavailable measurements are excluded, and stale data is shown as Unknown. Bands are Low (under 34), Elevated (34–66), and High (67 or above). This score is separate from alert status, is not validated, and does not assess food safety. “Low” does not mean maize is safe or free of mould, insects, or aflatoxin.
 
 ### Simulated ventilation control
 

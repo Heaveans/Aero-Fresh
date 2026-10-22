@@ -9,7 +9,7 @@ export function RulesPanel({ th, onChange, onDefaults, defaultOpen = false }: { 
       <details open={defaultOpen || undefined}>
         <summary className="cursor-pointer font-display text-lg font-bold text-forest-900">Rule thresholds</summary>
         <p className="mt-2 rounded-md bg-maize-100 p-2 text-sm">
-          These values are <b>illustrative and unvalidated</b>. They are simple demo rules, not agronomic guidance. Ambient humidity and grain moisture are evaluated separately; one is never used to estimate the other.
+          Set the thresholds AeroFresh uses to evaluate storage conditions and generate alerts. Ambient humidity and grain moisture are assessed independently; one is never used to estimate the other.
         </p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {THRESHOLD_FIELDS.map((f) => (

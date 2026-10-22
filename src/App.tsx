@@ -2,6 +2,7 @@ import { useEffect, useReducer, useState } from 'react';
 import { Droplets, Gauge, Thermometer, Trash2, Wheat } from 'lucide-react';
 import { AlertsPanel } from './components/AlertsPanel';
 import { AlertHistoryPanel } from './components/AlertHistoryPanel';
+import { ConditionScorePanel } from './components/ConditionScorePanel';
 import { EventsPanel } from './components/EventsPanel';
 import { FanPanel } from './components/FanPanel';
 import { MetricCard, StatusCard } from './components/Metrics';
@@ -14,6 +15,7 @@ import { TrendChart } from './components/TrendChart';
 import { TrendSummary } from './components/TrendSummary';
 import { fmtTime } from './lib/format';
 import { lastValid, overallStatus } from './lib/risk';
+import { computeConditionScore } from './lib/score';
 import { BASE_INTERVAL_MS, SCENARIOS, UNIT_NAME, makeNoise } from './lib/simulator';
 import { clearPersisted, loadPersisted, savePersisted } from './lib/storage';
 import { initState, reducer } from './lib/store';
@@ -49,6 +51,7 @@ export default function App() {
   const staleNote = lv ? `Stale: last valid reading at ${fmtTime(lv.t)}` : 'No valid reading';
   const note = (live: string) => (stale ? staleNote : lv ? `Updated ${fmtTime(lv.t)}` : live);
   const moisture = lv?.moisture ?? null;
+  const conditionScore = computeConditionScore(s.history, s.sim.missedTicks, s.thresholds);
 
   const start = () => {
     dispatch({ type: 'start' });
@@ -128,13 +131,18 @@ export default function App() {
               <>
                 <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <StatusCard level={level} openAlerts={openAlerts} />
-                  <MetricCard icon={<Thermometer size={18} aria-hidden />} label="Temperature" value={lv?.temp != null ? lv.temp.toFixed(1) : null} unit="°C" note={note('Press Start to begin')} stale={stale} />
-                  <MetricCard icon={<Droplets size={18} aria-hidden />} label="Ambient relative humidity" value={lv?.rh != null ? lv.rh.toFixed(1) : null} unit="%" note={note('Air humidity, not grain moisture')} stale={stale} />
+                  <MetricCard icon={<Thermometer size={18} aria-hidden />} label="Temperature" sensorType="DS18B20" value={lv?.temp != null ? lv.temp.toFixed(1) : null} unit="°C" note={note('Press Start to begin')} stale={stale} />
+                  <MetricCard icon={<Droplets size={18} aria-hidden />} label="Ambient relative humidity" sensorType="SHT31" value={lv?.rh != null ? lv.rh.toFixed(1) : null} unit="%" note={note('Air humidity, not grain moisture')} stale={stale} />
                   <MetricCard icon={<Gauge size={18} aria-hidden />} label="Grain moisture" value={moisture !== null ? moisture.toFixed(1) : null} unit="%" note={moisture !== null ? note('') : 'Not measured in this scenario'} stale={stale && moisture !== null} />
                 </section>
 
                 <section className="grid items-start gap-4 xl:grid-cols-3">
-                  <TrendChart history={s.history} th={s.thresholds} className="xl:col-span-2" />
+                  <TrendChart
+                    history={s.history}
+                    th={s.thresholds}
+                    missedTicks={s.sim.missedTicks}
+                    className="xl:col-span-2"
+                  />
                   <SimulatorPanel {...simulatorProps} />
                 </section>
 
@@ -143,7 +151,15 @@ export default function App() {
                   <FanPanel fanOn={s.fanOn} fanMode={s.fanMode} fanUntilAt={s.fanUntilAt} alerts={s.alerts} scenario={s.scenario} interventions={s.interventions} onCommand={(command) => dispatch({ type: 'fan', command, now: Date.now() })} />
                 </section>
 
-                <PredictionPanel history={s.history} thresholds={s.thresholds} />
+                <section className="grid items-start gap-4 xl:grid-cols-3">
+                  <PredictionPanel
+                    history={s.history}
+                    thresholds={s.thresholds}
+                    missedTicks={s.sim.missedTicks}
+                    className="xl:col-span-2"
+                  />
+                  <ConditionScorePanel result={conditionScore} />
+                </section>
                 <EventsPanel events={s.events} />
               </>
             )}
@@ -167,8 +183,16 @@ export default function App() {
             {page === 'trends' && (
               <>
                 <TrendSummary history={s.history} />
-                <TrendChart history={s.history} th={s.thresholds} />
-                <PredictionPanel history={s.history} thresholds={s.thresholds} />
+                <TrendChart history={s.history} th={s.thresholds} missedTicks={s.sim.missedTicks} />
+                <section className="grid items-start gap-4 xl:grid-cols-3">
+                  <PredictionPanel
+                    history={s.history}
+                    thresholds={s.thresholds}
+                    missedTicks={s.sim.missedTicks}
+                    className="xl:col-span-2"
+                  />
+                  <ConditionScorePanel result={conditionScore} />
+                </section>
                 <EventsPanel events={s.events} />
               </>
             )}

@@ -26,13 +26,14 @@ export function StatusCard({ level, openAlerts }: { level: RiskLevel; openAlerts
   );
 }
 
-export function MetricCard(props: { icon: ReactNode; label: string; value: string | null; unit: string; note: string; stale?: boolean }) {
-  const { icon, label, value, unit, note, stale } = props;
+export function MetricCard(props: { icon: ReactNode; label: string; value: string | null; unit: string; note: string; sensorType?: string; stale?: boolean }) {
+  const { icon, label, value, unit, note, sensorType, stale } = props;
   return (
     <div className={`card ${stale ? 'border-maize-500 bg-maize-100/40' : ''}`}>
       <div className="flex items-center gap-2 text-sm text-forest-800">
         {icon} {label}
       </div>
+      {sensorType && <div className="mt-1 text-xs text-charcoal/60">Sensor: {sensorType}</div>}
       <div className={`mt-2 font-display text-4xl font-bold ${value === null ? 'text-charcoal/30' : ''} ${stale ? 'text-charcoal/60' : ''}`}>
         {value ?? '—'}
         {value !== null && <span className="ml-1 text-lg font-normal text-charcoal/60">{unit}</span>}
